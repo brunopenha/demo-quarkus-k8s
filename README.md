@@ -92,6 +92,139 @@ curl $(minikube service $(mvn help:evaluate -Dexpression=project.version -Dexpre
 ```
 
 
+## For monitoring
+
+1 - Include this dependency:
+
+```xml
+<dependency>
+      <groupId>io.quarkus</groupId>
+    <artifactId>quarkus-micrometer-registry-prometheus</artifactId>
+</dependency>
+```
+
+2 - Only by doing that, we can check the metrics:
+
+```shell
+curl http://localhost:8080/q/metrics
+```
+
+3 - Include this `MeterRegistry` object to register meters
+
+```java
+private final MeterRegistry registry;
+```
+
+4 - Include one `gaugeCollectionSize`. Gauges measure a value that can increase or decrease over time, 
+like the speedometer on a car. Gauges can be useful when monitoring the statistics for a cache or collection.
+
+```java
+LinkedList<Long> list = new LinkedList<>();
+
+ExampleResource(MeterRegistry registry) {
+    this.registry = registry;
+    registry.gaugeCollectionSize("example.list.size", Tags.empty(), list);
+}
+
+@GET
+@Path("gauge/{number}")
+public Long checkListSize(@PathParam("number") long number) {
+    if (number == 2 || number % 2 == 0) {
+        // add even numbers to the list
+        list.add(number);
+    } else {
+        // remove items from the list for odd numbers
+        try {
+            number = list.removeFirst();
+        } catch (NoSuchElementException nse) {
+            number = 0;
+        }
+    }
+    return number;
+}
+```
+When using Prometheus, the value of the created gauge and the size
+of the list is observed when the Prometheus endpoint is visited.
+
+```
+# HELP http_server_requests_seconds  
+http_server_requests_seconds_count{method="GET",outcome="SUCCESS",status="200",uri="/gauge/{number}"} 2.0
+http_server_requests_seconds_sum{method="GET",outcome="SUCCESS",status="200",uri="/gauge/{number}"} 0.029338753
+# TYPE http_server_requests_seconds_max gauge
+# HELP http_server_requests_seconds_max  
+http_server_requests_seconds_max{method="GET",outcome="SUCCESS",status="200",uri="/gauge/{number}"} 0.024757296
+```
+
+5 - Include Counters. Counters are used to measure values that only increase.
+
+```java
+@GET
+@Path("prime/{number}")
+public String checkIfPrime(@PathParam("number") long number) {
+    if (number < 1) {
+        return "Only natural numbers can be prime numbers.";
+    }
+    if (number == 1 || number == 2 || number % 2 == 0) {
+        return number + " is not prime.";
+    }
+
+    if ( testPrimeNumber(number) ) {
+        return number + " is prime.";
+    } else {
+        return number + " is not prime.";
+    }
+}
+
+protected boolean testPrimeNumber(long number) {
+    // Count the number of times we test for a prime number
+    registry.counter("example.prime.number").increment();
+    for (int i = 3; i < Math.floor(Math.sqrt(number)) + 1; i = i + 2) {
+        if (number % i == 0) {
+            return false;
+        }
+    }
+    return true;
+}
+```
+
+It might be tempting to add a label or tag to the counter indicating what value was checked. 
+Remember that each unique combination of metric name (testPrimeNumber) and label value produces a unique time series. 
+Using an unbounded set of data as label values can lead to a "cardinality explosion", 
+an exponential increase in the creation of new time series.
+
+6 - Now we can run some examples and check `example_prime_number_total` counters:
+
+```shell
+curl http://localhost:8080/prime/-1
+curl http://localhost:8080/prime/0
+curl http://localhost:8080/prime/1
+curl http://localhost:8080/prime/2
+curl http://localhost:8080/prime/3
+curl http://localhost:8080/prime/15
+curl http://localhost:8080/q/metrics
+```
+
+And we should find these metrics:
+
+```
+# TYPE http_server_requests_seconds summary
+# HELP http_server_requests_seconds  
+http_server_requests_seconds_count{method="GET",outcome="SUCCESS",status="200",uri="/prime/{number}"} 7.0
+http_server_requests_seconds_sum{method="GET",outcome="SUCCESS",status="200",uri="/prime/{number}"} 0.020481525
+http_server_requests_seconds_count{method="GET",outcome="CLIENT_ERROR",status="404",uri="NOT_FOUND"} 9.0
+http_server_requests_seconds_sum{method="GET",outcome="CLIENT_ERROR",status="404",uri="NOT_FOUND"} 1.086705802
+# TYPE http_server_requests_seconds_max gauge
+# HELP http_server_requests_seconds_max  
+http_server_requests_seconds_max{method="GET",outcome="SUCCESS",status="200",uri="/prime/{number}"} 0.007181645
+http_server_requests_seconds_max{method="GET",outcome="CLIENT_ERROR",status="404",uri="NOT_FOUND"} 0.0
+# TYPE jvm_gc_max_data_size_bytes gauge
+# HELP jvm_gc_max_data_size_bytes Max size of long-lived heap memory pool
+jvm_gc_max_data_size_bytes 2.057306112E9
+# TYPE example_prime_number counter
+# HELP example_prime_number  
+example_prime_number_total 3.0
+```
+
 
 ## Running the application in dev mode
 
