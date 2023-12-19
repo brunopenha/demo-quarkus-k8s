@@ -2,18 +2,27 @@
 
 This project uses Quarkus, the Supersonic Subatomic Java Framework.
 
-If you want to learn more about Quarkus, please visit its website: https://quarkus.io/ .
+If you want to learn more about Quarkus, please visit its website: https://quarkus.io/.
 
-This project also is a demonstration on how to update the configuration here from config map in Kubernetes.
+This project also demonstrates how to update the configuration here from the config map in Kubernetes.
 
-Initially we will create a project by following this page: https://quarkus.io/guides/deploying-to-kubernetes
+Initially, we will create a project by following this page: https://quarkus.io/guides/deploying-to-kubernetes
 
 
-Monstly we use this page as referece - https://quarkus.io/guides/config-reference
+Mostly we use this page as a reference - https://quarkus.io/guides/config-reference
 
-## Extentions used here
+## Extensions used here
 
-1 - Yaml config - allow us to get values from config map
+1 - Container image Jib - to create our local docker image
+
+```xml
+<dependency>
+  <groupId>io.quarkus</groupId>
+  <artifactId>quarkus-container-image-jib</artifactId>
+</dependency>
+```
+
+2 - Yaml config - allow us to get values from the config map
 
 ```xml
 <dependency>
@@ -22,7 +31,7 @@ Monstly we use this page as referece - https://quarkus.io/guides/config-referenc
 </dependency>
 ```
 
-1 - Minikube - to generate minikube YAML file
+3 - Minikube - to generate minikube YAML file
 
 ```xml
     <dependency>
@@ -45,6 +54,13 @@ docker rmi -f $(docker images | grep $(mvn help:evaluate -Dexpression=project.ve
 ```shell script
 mvn clean package -Dquarkus.container-image.build=true
 ```
+> [!TIP]
+> In case you are under some Internet office network, include these parameters in Maven clean package execution:
+
+```shell script
+Dhttp.proxyHost=<PROXY IP> -Dhttp.proxyPort=<PROXY PORT> -Dhttps.proxyHost=<PROXY IP> -Dhttps.proxyPort=<PROXY PORT>
+```
+
 
 3 - Tag the created image
 
@@ -72,6 +88,14 @@ kubectl apply -f src/main/k8s-files/config_map.yml
 ```shell
 curl $(minikube service demo-quarkus-k8s --url)/hello
 ```
+> [!TIP]
+> There is a small possibility you may get an error "This control plane is not running! (state=Stopped)" (ie, by using Gokube).
+> To workaround that, use this Kubernetes command to get the port number
+
+```shell script
+kubectl get svc demo-quarkus-k8s
+```
+
 
 7 - Edit configuration
 
@@ -187,12 +211,12 @@ protected boolean testPrimeNumber(long number) {
 }
 ```
 
-It might be tempting to add a label or tag to the counter indicating what value was checked. 
-Remember that each unique combination of metric name (testPrimeNumber) and label value produces a unique time series. 
-Using an unbounded set of data as label values can lead to a "cardinality explosion", 
+Adding a label or tag to the counter might be tempting to indicate what value was checked. 
+Remember that each unique combination of a metric name (testPrimeNumber) and label value produces a unique time series. 
+Using an unbounded data set as label values can lead to a "cardinality explosion", 
 an exponential increase in the creation of new time series.
 
-6 - Now we can run some examples and check `example_prime_number_total` counters:
+6 - Now we can run some examples and check the `example_prime_number_total` counters:
 
 ```shell
 curl http://localhost:8080/prime/-1
