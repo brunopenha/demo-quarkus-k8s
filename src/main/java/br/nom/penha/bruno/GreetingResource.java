@@ -42,7 +42,7 @@ public class GreetingResource {
         if (number < 1) {
             return "Only natural numbers can be prime numbers.";
         }
-        if (number == 1 || number == 2 || number % 2 == 0) {
+        if (number % 2 == 0) {
             return number + " is not prime.";
         }
 
