@@ -153,7 +153,7 @@ ExampleResource(MeterRegistry registry) {
 @GET
 @Path("gauge/{number}")
 public Long checkListSize(@PathParam("number") long number) {
-    if (number == 2 || number % 2 == 0) {
+    if (number % 2 == 0) {
         // add even numbers to the list
         list.add(number);
     } else {
